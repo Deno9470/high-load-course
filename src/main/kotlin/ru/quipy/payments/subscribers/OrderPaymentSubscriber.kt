@@ -12,6 +12,7 @@ import ru.quipy.orders.api.OrderPaymentStartedEvent
 import ru.quipy.payments.api.PaymentAggregate
 import ru.quipy.payments.config.ExternalServicesConfig
 import ru.quipy.payments.logic.PaymentAggregateState
+import ru.quipy.payments.logic.PaymentManager
 import ru.quipy.payments.logic.PaymentService
 import ru.quipy.payments.logic.create
 import ru.quipy.streams.AggregateSubscriptionsManager
@@ -35,11 +36,22 @@ class OrderPaymentSubscriber {
     @Autowired
     @Qualifier(ExternalServicesConfig.PRIMARY_PAYMENT_BEAN)
     private lateinit var paymentService: PaymentService
+    @Autowired
+    @Qualifier(ExternalServicesConfig.FIRST_SERVICE_BEAN)
+    private lateinit var firstPaymentService: PaymentService
+    @Autowired
+    @Qualifier(ExternalServicesConfig.SECOND_SERVICE_BEAN)
+    private lateinit var secondPaymentService: PaymentService
+
+    private var paymentManager = PaymentManager(listOf(firstPaymentService, secondPaymentService))
 
     private val paymentExecutor = Executors.newFixedThreadPool(16, NamedThreadFactory("payment-executor"))
 
     @PostConstruct
     fun init() {
+        // TODO Это менят надо
+        // Тут надо чекать второй акк, если он не может, то надо тыкать первый
+        // Сделать счетчик транзакций и перенаправлять лишние
         subscriptionsManager.createSubscriber(OrderAggregate::class, "payments:order-subscriber", retryConf = RetryConf(1, RetryFailedStrategy.SKIP_EVENT)) {
             `when`(OrderPaymentStartedEvent::class) { event ->
                 paymentExecutor.submit {
@@ -52,7 +64,7 @@ class OrderPaymentSubscriber {
                     }
                     logger.info("Payment ${createdEvent.paymentId} for order ${event.orderId} created.")
 
-                    paymentService.submitPaymentRequest(createdEvent.paymentId, event.amount, event.createdAt)
+                    paymentManager.submitPaymentRequest(createdEvent.paymentId, event.amount, event.createdAt)
                 }
             }
         }

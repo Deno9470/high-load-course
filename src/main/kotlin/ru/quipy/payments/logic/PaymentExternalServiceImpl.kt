@@ -40,7 +40,7 @@ class PaymentExternalServiceImpl(
     private lateinit var paymentESService: EventSourcingService<UUID, PaymentAggregate, PaymentAggregateState>
 
     private val httpClientExecutor = Executors.newSingleThreadExecutor()
-
+    // TODO где тут вставит timeout из paymentOperationTimeout
     private val client = OkHttpClient.Builder().run {
         dispatcher(Dispatcher(httpClientExecutor))
         build()
